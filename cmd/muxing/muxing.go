@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 
 	"github.com/gorilla/mux"
@@ -21,18 +21,68 @@ main function reads host/port from env just for an example, flavor it following 
 func Start(host string, port int) {
 	router := mux.NewRouter()
 
+	router.HandleFunc("/name/{PARAM}", handleName).Methods(http.MethodGet)
+	router.HandleFunc("/bad", handleBadRoute).Methods(http.MethodGet)
+	router.HandleFunc("/data", handlePOSTData).Methods(http.MethodPost)
+	router.HandleFunc("/headers", handleHeaders).Methods(http.MethodPost)
+
 	log.Println(fmt.Printf("Starting API server on %s:%d\n", host, port))
 	if err := http.ListenAndServe(fmt.Sprintf("%s:%d", host, port), router); err != nil {
 		log.Fatal(err)
 	}
 }
 
-//main /** starts program, gets HOST:PORT param and calls Start func.
+// main /** starts program, gets HOST:PORT param and calls Start func.
 func main() {
-	host := os.Getenv("HOST")
-	port, err := strconv.Atoi(os.Getenv("PORT"))
-	if err != nil {
-		port = 8081
-	}
+	// host := os.Getenv("HOST")
+	// port, err := strconv.Atoi(os.Getenv("PORT"))
+	// if err != nil {
+	// 	port = 8081
+	// }
+	host := "localhost"
+	port := 8081
 	Start(host, port)
+}
+
+// HandleFunctions
+func handleName(w http.ResponseWriter, r *http.Request) {
+	param := mux.Vars(r)["PARAM"]
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "Hello, %v!", param)
+}
+
+func handleBadRoute(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusInternalServerError)
+}
+
+func handlePOSTData(w http.ResponseWriter, r *http.Request) {
+	msg := ""
+	d, err := io.ReadAll(r.Body)
+	if err != nil {
+		msg = err.Error()
+		w.WriteHeader(http.StatusBadRequest)
+	} else {
+		msg = fmt.Sprintf("I got message:\n%v", string(d))
+		w.WriteHeader(http.StatusOK)
+	}
+	fmt.Fprint(w, msg)
+}
+
+func handleHeaders(w http.ResponseWriter, r *http.Request) {
+	firstElement := r.Header.Get("a")
+	secondElement := r.Header.Get("b")
+
+	firstNum, err := strconv.Atoi(firstElement)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, err.Error())
+		return
+	}
+	secondNum, err := strconv.Atoi(secondElement)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, err.Error())
+		return
+	}
+	w.Header().Add("a+b", fmt.Sprintf("%d", firstNum+secondNum))
 }
